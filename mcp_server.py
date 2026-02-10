@@ -27,12 +27,12 @@ async def _lifespan(_app: FastAPI):
         yield
 
 
-app = FastAPI(title="mcp_tool_rag_query_v1", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title=settings.mcp_name, version="0.1.0", lifespan=_lifespan)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "mcp": settings.mcp_name}
+    return {"status": "ok", "mcp": settings.mcp_name, "env": settings.app_env}
 
 
 app.mount("/mcp", mcp_app)
