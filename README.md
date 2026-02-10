@@ -90,6 +90,31 @@ curl -s -X POST \
   http://localhost:8000/mcp/
 ```
 
+
+### Docker
+
+Build the image:
+
+```bash
+docker build -t rag-mcp .
+```
+
+Run the container. **Required:** `OPENAI_API_KEY` and Chroma vars must be available (e.g. in `.env`). Use `--env-file .env` from the directory that contains your `.env`, or pass keys with `-e`:
+
+```bash
+docker run -p 8000:8000 \
+  --env-file .env \
+  -e APP_ENV=dev \
+  rag-mcp
+```
+
+If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Ensure `.env` exists in the current directory and contains `OPENAI_API_KEY=...`, or run with:
+
+```bash
+docker run -p 8000:8000 -e OPENAI_API_KEY=your-key --env-file .env -e APP_ENV=dev rag-mcp
+```
+
+
 ---
 
 ### Optional: sync .env to GitHub Actions secrets

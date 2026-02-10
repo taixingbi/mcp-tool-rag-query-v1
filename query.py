@@ -133,7 +133,12 @@ def build_rag_chain(where: Optional[Dict[str, Any]] = None):
         _rag_chain = (
             {"context": get_retriever(where=where) | format_docs, "question": RunnablePassthrough()}
             | RAG_PROMPT
-            | ChatOpenAI(model=CHAT_MODEL, temperature=0)
+            | ChatOpenAI(
+                model=CHAT_MODEL, 
+                temperature=0,
+                timeout=30,
+                max_retries=2
+                )
             | StrOutputParser()
         )
     return _rag_chain
@@ -189,25 +194,6 @@ def run_query_with_chunks(
     chunks = retrieve_ranked_chunks(question, k=chunk_k, where=where)
     answer = run_query(question, where=where)
     return {"answer": answer, "chunks": chunks}
-
-
-# ----------------------------
-# MCP tools (register on FastMCP with register_mcp_tools(mcp))
-# ----------------------------
-def register_mcp_tools(mcp: Any) -> None:
-    """Register RAG tools on an MCP server (e.g. FastMCP from mcp.server)."""
-
-    @mcp.tool()
-    def rag_query(question: str) -> str:
-        """Answer a question using RAG (Chroma + LLM)."""
-        return run_query(question)
-
-    @mcp.tool()
-    def rag_query_with_chunks(question: str) -> str:
-        """Answer a question and return the answer plus top ranked chunks as JSON."""
-        import json
-        result = run_query_with_chunks(question)
-        return json.dumps(result, ensure_ascii=False)
 
 
 if __name__ == "__main__":

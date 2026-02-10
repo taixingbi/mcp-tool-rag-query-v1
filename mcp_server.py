@@ -1,13 +1,13 @@
-# mcp_server.py — MCP server using tools registered in query.py
+# mcp_server.py — MCP HTTP server exposing RAG tools
 import contextlib
+import json
 from fastapi import FastAPI
 from mcp.server import FastMCP
 
 from config import settings
-from query import register_mcp_tools
+from query import run_query, run_query_with_chunks
 
-# Use mcp.server.FastMCP so we can run session_manager in parent lifespan when mounted.
-# streamable_http_path="/" so the sub-app route matches when mounted at /mcp (path becomes / or "").
+# streamable_http_path="/" so mounted at /mcp matches (path becomes /)
 mcp = FastMCP(
     settings.mcp_name,
     stateless_http=True,
@@ -15,8 +15,18 @@ mcp = FastMCP(
     streamable_http_path="/",
 )
 
-# Register RAG tools from query.py
-register_mcp_tools(mcp)
+
+@mcp.tool()
+def rag_query(question: str) -> str:
+    """Answer a question using RAG (Chroma + LLM)."""
+    return run_query(question)
+
+
+@mcp.tool()
+def rag_query_with_chunks(question: str) -> str:
+    """Answer plus top ranked chunks as JSON."""
+    return json.dumps(run_query_with_chunks(question), ensure_ascii=False)
+
 
 mcp_app = mcp.streamable_http_app()
 
