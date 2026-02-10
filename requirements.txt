@@ -1,0 +1,19 @@
+# RAG
+chromadb
+langchain
+langchain-community
+langchain-openai
+tiktoken
+
+# MCP
+MCP
+
+# Web (optional: for SSE transport)
+fastapi
+uvicorn[standard]
+
+# Env
+python-dotenv
+
+# Dev
+pytest
