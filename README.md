@@ -15,32 +15,25 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Create `.env` in the project root. Config loads `.env` then `.env.{APP_ENV}` (e.g. `.env.dev`).
+Create env files in the project root. Config loads `.env` then `.env.{APP_ENV}` (e.g. `APP_ENV=qa` → `.env` then `.env.qa`). Use the same variable names in each file; values differ per env.
+
+**`.env`** (dev or shared):
 
 ```
-# Required for LangChain (ChatOpenAI, OpenAIEmbeddings)
+APP_VERSION=v:1.01
 OPENAI_API_KEY=your-openai-key
-
-# dev | qa | prod — selects which CHROMA_*_DEV / _QA / _PROD to use
-APP_ENV=dev
-
-# Chroma Cloud: use CHROMA_* or CHROMA_*_DEV / _QA / _PROD per env
-CHROMA_API_KEY_DEV=...
-CHROMA_TENANT_DEV=...
-CHROMA_DATABASE_DEV=rag_dev
-CHROMA_API_KEY_QA=...
-CHROMA_TENANT_QA=...
-CHROMA_DATABASE_QA=rag_qa
-CHROMA_API_KEY_PROD=...
-CHROMA_TENANT_PROD=...
-CHROMA_DATABASE_PROD=rag_prod
+CHROMA_API_KEY=...
+CHROMA_TENANT=...
+CHROMA_DATABASE=rag_dev
 ```
+
+**`.env.qa`** and **`.env.prod`** — same keys, qa/prod values (e.g. `CHROMA_DATABASE=rag_qa` or `rag_prod`). Set `APP_ENV=qa` or `APP_ENV=prod` when running so the right file is loaded.
 
 ---
 
 ## Local run (dev / qa / prod)
 
-Set `APP_ENV` to choose which Chroma credentials (and optional `.env.qa` / `.env.prod`) are used. Default is `dev` if unset.
+Set `APP_ENV` so config loads `.env` then `.env.{APP_ENV}` (e.g. `APP_ENV=qa` → `.env.qa`). Default is `dev`.
 
 ### Run RAG from the CLI (no server)
 
@@ -99,25 +92,25 @@ Build the image:
 docker build -t rag-mcp .
 ```
 
-Run the container. **Required:** `OPENAI_API_KEY` and Chroma vars must be available (e.g. in `.env`). Use `--env-file .env` from the directory that contains your `.env`, or pass keys with `-e`:
+Run the container. Pass env from the correct file for the env you want (`.env` / `.env.qa` / `.env.prod`). The image does not include env files (they are in `.dockerignore`).
 
 ```bash
-docker run -p 8000:8000 \
-  --env-file .env \
-  -e APP_ENV=dev \
-  rag-mcp
+# dev (from directory that has .env)
+docker run -p 8000:8000 --env-file .env -e APP_ENV=dev rag-mcp
+
+# qa
+docker run -p 8000:8000 --env-file .env.qa -e APP_ENV=qa rag-mcp
+
+# prod
+docker run -p 8000:8000 --env-file .env.prod -e APP_ENV=prod rag-mcp
 ```
 
-If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Ensure `.env` exists in the current directory and contains `OPENAI_API_KEY=...`, or run with:
-
-```bash
-docker run -p 8000:8000 -e OPENAI_API_KEY=your-key --env-file .env -e APP_ENV=dev rag-mcp
-```
+If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Use `--env-file .env` (or `.env.qa` / `.env.prod`) from the directory that contains that file, or pass `-e OPENAI_API_KEY=...`.
 
 
 ---
 
-### Optional: sync .env to GitHub Actions secrets
+## Optional: sync env to GitHub Actions secrets
 
 One-liner (simple .env with no `#` or spaces around `=`):
 

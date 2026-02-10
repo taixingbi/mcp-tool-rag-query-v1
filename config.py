@@ -10,21 +10,17 @@ from dotenv import load_dotenv
 
 _ROOT = Path(__file__).resolve().parent
 
-# 1️⃣ Determine env FIRST (from real OS env)
 _APP_ENV = (os.getenv("APP_ENV") or "dev").strip().lower()
 if _APP_ENV not in ("dev", "qa", "prod"):
     _APP_ENV = "dev"
 
-# 2️⃣ Load base .env (defaults) — do NOT override real env
 load_dotenv(_ROOT / ".env", override=True)
-
-# 3️⃣ Load env-specific file — override base .env
 load_dotenv(_ROOT / f".env.{_APP_ENV}", override=True)
 
 print("APP_ENV", _APP_ENV) 
-print("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY")) 
-print("CHROMA_API_KEY", os.getenv("CHROMA_API_KEY")) 
-print("CHROMA_TENANT", os.getenv("CHROMA_TENANT")) 
+print("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+print("CHROMA_API_KEY", os.getenv("CHROMA_API_KEY"))
+print("CHROMA_TENANT", os.getenv("CHROMA_TENANT"))
 print("CHROMA_DATABASE", os.getenv("CHROMA_DATABASE"))
 
 def _chroma_env(key: str) -> str | None:

@@ -1,33 +1,32 @@
 # ---- base image ----
-  FROM python:3.11-slim
+FROM python:3.11-slim
 
-  # ---- system settings ----
-  ENV PYTHONDONTWRITEBYTECODE=1 \
-      PYTHONUNBUFFERED=1
-  
-  WORKDIR /app
-  
-  # ---- install system deps (optional but safe) ----
-  RUN apt-get update && apt-get install -y \
-      build-essential \
-      curl \
-      && rm -rf /var/lib/apt/lists/*
-  
-  # ---- install python deps first (better layer caching) ----
-  COPY requirements.txt .
-  RUN pip install --no-cache-dir --upgrade pip \
-      && pip install --no-cache-dir -r requirements.txt
-  
-  # ---- copy app code ----
-  COPY . .
-  
-  # ---- default env ----
-  # can be overridden by docker run -e APP_ENV=qa/prod
-  ENV APP_ENV=dev
-  
-  # ---- expose port ----
-  EXPOSE 8000
-  
-  # ---- start MCP server ----
-  CMD ["uvicorn", "mcp_server:app", "--host", "0.0.0.0", "--port", "8000"]
-  
+# ---- system settings ----
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# ---- install system deps (optional but safe) ----
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- install python deps first (better layer caching) ----
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# ---- copy app code (.env / .env.qa / .env.prod are in .dockerignore; pass at run time) ----
+COPY . .
+
+# ---- default env (override with docker run -e APP_ENV=qa or --env-file .env.qa) ----
+ENV APP_ENV=dev
+
+# ---- expose port ----
+EXPOSE 8000
+
+# ---- start MCP server ----
+# Require OPENAI_API_KEY and CHROMA_* via: docker run --env-file .env -e APP_ENV=dev ...
+CMD ["uvicorn", "mcp_server:app", "--host", "0.0.0.0", "--port", "8000"]
