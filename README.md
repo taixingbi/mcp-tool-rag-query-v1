@@ -29,33 +29,33 @@ CHROMA_DATABASE=rag_dev
 
 ---
 
-## Local run
+## Local Development
 
 <!-- All commands below assume you are in the repo root and have activated the venv. -->
-### Run RAG from the CLI (no server)
+
+### Run RAG from CLI
 
 ```bash
 python query.py "what is taixing visa"
 ```
 
-### Run the MCP HTTP server
+### Run MCP HTTP Server
 
 ```bash
 uvicorn mcp_server:app --reload --port 8000
 ```
 
-### Health check
+### Test Endpoints
+
+**Health check:**
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-### Call MCP tools via curl
+**Call MCP tools** (use trailing slash `/mcp/` to avoid 307 redirect):
 
-<!-- Use trailing slash on /mcp/ to avoid 307 redirect from the framework. -->
-Use **trailing slash** (`/mcp/`) to avoid 307 redirect.
-
-**`rag_query`** — returns only the RAG answer (plain text):
+**`rag_query`** — returns only the RAG answer:
 
 ```bash
 curl -s -X POST \
@@ -75,41 +75,38 @@ curl -s -X POST \
   http://localhost:8000/mcp/
 ```
 
+---
 
-### Docker
+## Docker
 
 <!-- Image does not bundle .env; pass --env-file at run time. -->
-Build the image:
+Build and run:
 
 ```bash
 docker build -t rag-mcp .
-```
-
-Run the container with env from `.env`. The image does not include env files (they are in `.dockerignore`).
-
-```bash
 docker run -p 8000:8000 --env-file .env rag-mcp
 ```
 
-If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Use `--env-file .env` from the directory that contains that file.
+> **Note:** If you see *"api_key client option must be set"*, ensure `--env-file .env` points to the file containing `OPENAI_API_KEY`.
 
+---
 
-### Fly.io (dev / qa / prod)
+## Fly.io Deployment
 
 <!-- One Fly app per env; set secrets per app; deploy with --app <name>. -->
-Use one app per environment: `mcp-tool-rag-query-v1-{env}` with `{env}` = `dev`, `qa`, or `prod`. Each app gets its own secrets from the matching env file; the same `fly.toml` is used for all.
+Use one app per environment: `mcp-tool-rag-query-v1-{env}` where `{env}` = `dev`, `qa`, or `prod`. Each app gets its own secrets; the same `fly.toml` is used for all.
 
-**One-time setup** (run from repo root):
+### One-time Setup
 
 ```bash
 brew install flyctl
 fly auth login
-fly auth token
+fly auth token  # Use output as GitHub Actions secret FLY_API_TOKEN if using CI
 ```
 
-Use `fly auth token` output as GitHub Actions secret `FLY_API_TOKEN` if you use CI.
+### Create Apps
 
-**Create apps per environment** (run once per env; each creates an app and uses the repo’s `fly.toml`):
+Run once per environment:
 
 ```bash
 fly launch --name mcp-tool-rag-query-v1-dev
@@ -117,6 +114,7 @@ fly launch --name mcp-tool-rag-query-v1-qa
 fly launch --name mcp-tool-rag-query-v1-prod
 ```
 
+### Set Secrets
 
 <!-- Deploy: use --app to target dev/qa/prod; omit --no-cache for faster builds when deps unchanged. -->
 ```bash
@@ -125,14 +123,14 @@ fly deploy --no-cache --app mcp-tool-rag-query-v1-qa
 fly deploy --no-cache --app mcp-tool-rag-query-v1-prod
 ```
 
-** dev
+**QA** (from `.env.qa`):
 
-<!-- Verify app is up before calling /mcp/. -->
 ```bash
 curl https://mcp-tool-rag-query-v1-dev.fly.dev/health
 ```
 
-**`rag_query`** — returns only the RAG answer (plain text):
+**Prod** (from `.env.prod`):
+
 ```bash
 curl -s -X POST \
   -H "Content-Type: application/json" \
@@ -141,7 +139,7 @@ curl -s -X POST \
   https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
 ```
 
-**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
+> **Tip:** If `grep`/`cut` corrupts keys (e.g., 401 errors), paste the key directly: `fly secrets set -a mcp-tool-rag-query-v1-dev OPENAI_API_KEY="sk-proj-YOUR_KEY"`
 
 ```bash
 curl -s -X POST \
@@ -151,56 +149,31 @@ curl -s -X POST \
   https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
 ```
 
-** qa
+### Test Deployed Apps
 
-<!-- Verify app is up before calling /mcp/. -->
-```bash
-curl https://mcp-tool-rag-query-v1-qa.fly.dev/health
-```
+Replace `{env}` with `dev`, `qa`, or `prod`:
 
-**`rag_query`** — returns only the RAG answer (plain text):
+**Health check:**
 
 ```bash
-curl -s -X POST \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
-  https://mcp-tool-rag-query-v1-qa.fly.dev/mcp/
+curl https://mcp-tool-rag-query-v1-dev.fly.dev/health
 ```
 
-**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
-
-```bash
-curl -s -X POST \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query_with_chunks","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
-  https://mcp-tool-rag-query-v1-qa.fly.dev/mcp/
-```
-
-** prod
-
-<!-- Verify app is up before calling /mcp/. -->
-```bash
-curl https://mcp-tool-rag-query-v1-prod.fly.dev/health
-```
-
-**`rag_query`** — returns only the RAG answer (plain text):
+**Call MCP tools:**
 
 ```bash
 curl -s -X POST \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
-  https://mcp-tool-rag-query-v1-prod.fly.dev/mcp/
+  https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
 ```
 
-**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
-
-```bash
+# rag_query_with_chunks
 curl -s -X POST \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query_with_chunks","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
-  https://mcp-tool-rag-query-v1-prod.fly.dev/mcp/
+  https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
 ```
+

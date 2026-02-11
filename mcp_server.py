@@ -53,7 +53,11 @@ app = FastAPI(title=settings.mcp_name, version="0.1.0", lifespan=_lifespan)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "mcp": settings.mcp_name}
-
+    return {"status": "ok", 
+            "mcp": settings.mcp_name, 
+            "version": settings.app_version, 
+            "LANGCHAIN_PROJECT": settings.langchain_project, 
+            "CHROMA_DATABASE": settings.chroma_database, 
+            "CHROMA_COLLECTION": settings.chroma_collection}
 
 app.mount("/mcp", mcp_app)
