@@ -1,7 +1,7 @@
 """Integration tests for RAG query pipeline."""
 import pytest
 
-from query import run_query
+from query import run_query, run_query_with_chunks
 
 
 def test_run_query_returns_answer():
@@ -34,3 +34,33 @@ def test_run_query_visa_returns_grounded_answer():
     )
     has_no_context = "does not" in answer.lower() or "no information" in answer.lower()
     assert has_visa_info or has_no_context
+
+
+def test_run_query_with_chunks_returns_answer_and_chunks():
+    """run_query_with_chunks returns answer, chunks, and metadata."""
+    result = run_query_with_chunks("What is this about?")
+    assert isinstance(result, dict)
+    assert "answer" in result
+    assert "chunks" in result
+    assert "metadata" in result
+    assert isinstance(result["answer"], str)
+    assert len(result["answer"].strip()) > 0
+    assert isinstance(result["chunks"], list)
+    assert isinstance(result["metadata"], dict)
+    assert "reranked_chunks" in result["metadata"]
+    assert isinstance(result["metadata"]["reranked_chunks"], list)
+    assert len(result["chunks"]) == len(result["metadata"]["reranked_chunks"])
+
+
+def test_run_query_with_chunks_chunks_have_expected_structure():
+    """Chunks returned by run_query_with_chunks have expected fields."""
+    result = run_query_with_chunks("What is this about?")
+    assert len(result["chunks"]) > 0
+    chunk = result["chunks"][0]
+    assert isinstance(chunk, dict)
+    assert "chunk_id" in chunk
+    assert "distance" in chunk
+    assert "text" in chunk
+    assert "metadata" in chunk
+    assert isinstance(chunk["distance"], (int, float))
+    assert isinstance(chunk["text"], str)
