@@ -15,6 +15,15 @@ from langchain_core.callbacks import CallbackManagerForRetrieverRun
 
 from config import settings, get_chroma_client
 
+# LangSmith tags for tracing (app_version, mcp_name from settings)
+def _langsmith_config() -> dict:
+    tags = []
+    if settings.app_version:
+        tags.append(f"app_version:{settings.app_version}")
+    if settings.mcp_name:
+        tags.append(f"mcp_name:{settings.mcp_name}")
+    return {"tags": tags} if tags else {}
+
 # Lazy singletons
 _chroma_collection = None
 _rag_chain = None
@@ -145,7 +154,7 @@ def build_rag_chain(where: Optional[Dict[str, Any]] = None):
 
 
 def run_query(question: str, where: Optional[Dict[str, Any]] = None) -> str:
-    return build_rag_chain(where=where).invoke(question)
+    return build_rag_chain(where=where).invoke(question, config=_langsmith_config())
 
 
 # ----------------------------
