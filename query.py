@@ -15,14 +15,19 @@ from langchain_core.callbacks import CallbackManagerForRetrieverRun
 
 from config import settings, get_chroma_client
 
-# LangSmith tags for tracing (app_version, mcp_name from settings)
-def _langsmith_config() -> dict:
+# LangSmith tags and metadata for tracing (app_version, mcp_name from settings)
+def _langsmith_config(metadata: Optional[Dict[str, Any]] = None) -> dict:
     tags = []
     if settings.app_version:
         tags.append(f"app_version:{settings.app_version}")
     if settings.mcp_name:
         tags.append(f"mcp_name:{settings.mcp_name}")
-    return {"tags": tags} if tags else {}
+    out: Dict[str, Any] = {}
+    if tags:
+        out["tags"] = tags
+    if metadata:
+        out["metadata"] = metadata
+    return out
 
 # Lazy singletons
 _chroma_collection = None
@@ -153,8 +158,14 @@ def build_rag_chain(where: Optional[Dict[str, Any]] = None):
     return _rag_chain
 
 
-def run_query(question: str, where: Optional[Dict[str, Any]] = None) -> str:
-    return build_rag_chain(where=where).invoke(question, config=_langsmith_config())
+def run_query(
+    question: str,
+    where: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> str:
+    return build_rag_chain(where=where).invoke(
+        question, config=_langsmith_config(metadata=metadata)
+    )
 
 
 # ----------------------------
@@ -197,12 +208,21 @@ def run_query_with_chunks(
     Returns:
       {
         "answer": "...",
-        "chunks": [ ... ranked chunks ... ]
+        "chunks": [ ... ranked chunks ... ],
+        "metadata": { "reranked_chunks": [ ... ] }
       }
     """
     chunks = retrieve_ranked_chunks(question, k=chunk_k, where=where)
-    answer = run_query(question, where=where)
-    return {"answer": answer, "chunks": chunks}
+    answer = run_query(
+        question,
+        where=where,
+        metadata={"reranked_chunks": chunks},
+    )
+    return {
+        "answer": answer,
+        "chunks": chunks,
+        "metadata": {"reranked_chunks": chunks},
+    }
 
 
 if __name__ == "__main__":
