@@ -6,6 +6,7 @@ RAG over documents using **Chroma Cloud** (dense search) and **LangChain**. Expo
 
 ## Setup
 
+<!-- Install Python deps in a venv before running or deploying. -->
 Create a virtualenv and install dependencies:
 
 ```bash
@@ -15,9 +16,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Create env files in the project root. Config loads `.env` then `.env.{APP_ENV}` (e.g. `APP_ENV=qa` → `.env` then `.env.qa`). Use the same variable names in each file; values differ per env.
-
-**`.env`** (dev or shared):
+<!-- .env is not committed; copy from .env.example or set these keys. -->
+Create a `.env` file in the project root:
 
 ```
 APP_VERSION=v:1.01
@@ -27,30 +27,21 @@ CHROMA_TENANT=...
 CHROMA_DATABASE=rag_dev
 ```
 
-**`.env.qa`** and **`.env.prod`** — same keys, qa/prod values (e.g. `CHROMA_DATABASE=rag_qa` or `rag_prod`). Set `APP_ENV=qa` or `APP_ENV=prod` when running so the right file is loaded.
-
 ---
 
-## Local run (dev / qa / prod)
+## Local run
 
-Set `APP_ENV` so config loads `.env` then `.env.{APP_ENV}` (e.g. `APP_ENV=qa` → `.env.qa`). Default is `dev`.
-
+<!-- All commands below assume you are in the repo root and have activated the venv. -->
 ### Run RAG from the CLI (no server)
 
 ```bash
-APP_ENV=dev  python query.py "what is taixing visa"
-APP_ENV=qa   python query.py "what is taixing visa"
-APP_ENV=prod python query.py "what is taixing visa"
+python query.py "what is taixing visa"
 ```
 
 ### Run the MCP HTTP server
 
-Start the server (optional: set `APP_ENV` for Chroma env):
-
 ```bash
-APP_ENV=dev  uvicorn mcp_server:app --reload --port 8000
-APP_ENV=qa   uvicorn mcp_server:app --reload --port 8000
-APP_ENV=prod uvicorn mcp_server:app --reload --port 8000
+uvicorn mcp_server:app --reload --port 8000
 ```
 
 ### Health check
@@ -61,6 +52,7 @@ curl http://127.0.0.1:8000/health
 
 ### Call MCP tools via curl
 
+<!-- Use trailing slash on /mcp/ to avoid 307 redirect from the framework. -->
 Use **trailing slash** (`/mcp/`) to avoid 307 redirect.
 
 **`rag_query`** — returns only the RAG answer (plain text):
@@ -86,37 +78,129 @@ curl -s -X POST \
 
 ### Docker
 
+<!-- Image does not bundle .env; pass --env-file at run time. -->
 Build the image:
 
 ```bash
 docker build -t rag-mcp .
 ```
 
-Run the container. Pass env from the correct file for the env you want (`.env` / `.env.qa` / `.env.prod`). The image does not include env files (they are in `.dockerignore`).
+Run the container with env from `.env`. The image does not include env files (they are in `.dockerignore`).
 
 ```bash
-# dev (from directory that has .env)
-docker run -p 8000:8000 --env-file .env -e APP_ENV=dev rag-mcp
-
-# qa
-docker run -p 8000:8000 --env-file .env.qa -e APP_ENV=qa rag-mcp
-
-# prod
-docker run -p 8000:8000 --env-file .env.prod -e APP_ENV=prod rag-mcp
+docker run -p 8000:8000 --env-file .env rag-mcp
 ```
 
-If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Use `--env-file .env` (or `.env.qa` / `.env.prod`) from the directory that contains that file, or pass `-e OPENAI_API_KEY=...`.
+If you see *"api_key client option must be set"*, the container is not getting `OPENAI_API_KEY`. Use `--env-file .env` from the directory that contains that file.
 
 
----
+### Fly.io (dev / qa / prod)
 
-## Optional: sync env to GitHub Actions secrets
+<!-- One Fly app per env; set secrets per app; deploy with --app <name>. -->
+Use one app per environment: `mcp-tool-rag-query-v1-{env}` with `{env}` = `dev`, `qa`, or `prod`. Each app gets its own secrets from the matching env file; the same `fly.toml` is used for all.
 
-One-liner (simple .env with no `#` or spaces around `=`):
+**One-time setup** (run from repo root):
 
 ```bash
-gh auth login
-grep -v '^#' .env | grep -v '^$' | while IFS='=' read -r name value; do gh secret set "$name" -b"$value"; done
+brew install flyctl
+fly auth login
+fly auth token
+```
+
+Use `fly auth token` output as GitHub Actions secret `FLY_API_TOKEN` if you use CI.
+
+**Create apps per environment** (run once per env; each creates an app and uses the repo’s `fly.toml`):
+
+```bash
+fly launch --name mcp-tool-rag-query-v1-dev
+fly launch --name mcp-tool-rag-query-v1-qa
+fly launch --name mcp-tool-rag-query-v1-prod
 ```
 
 
+<!-- Deploy: use --app to target dev/qa/prod; omit --no-cache for faster builds when deps unchanged. -->
+```bash
+fly deploy --no-cache --app mcp-tool-rag-query-v1-dev
+fly deploy --no-cache --app mcp-tool-rag-query-v1-qa
+fly deploy --no-cache --app mcp-tool-rag-query-v1-prod
+```
+
+** dev
+
+<!-- Verify app is up before calling /mcp/. -->
+```bash
+curl https://mcp-tool-rag-query-v1-dev.fly.dev/health
+```
+
+**`rag_query`** — returns only the RAG answer (plain text):
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
+```
+
+**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
+
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query_with_chunks","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-dev.fly.dev/mcp/
+```
+
+** qa
+
+<!-- Verify app is up before calling /mcp/. -->
+```bash
+curl https://mcp-tool-rag-query-v1-qa.fly.dev/health
+```
+
+**`rag_query`** — returns only the RAG answer (plain text):
+
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-qa.fly.dev/mcp/
+```
+
+**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
+
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query_with_chunks","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-qa.fly.dev/mcp/
+```
+
+** prod
+
+<!-- Verify app is up before calling /mcp/. -->
+```bash
+curl https://mcp-tool-rag-query-v1-prod.fly.dev/health
+```
+
+**`rag_query`** — returns only the RAG answer (plain text):
+
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-prod.fly.dev/mcp/
+```
+
+**`rag_query_with_chunks`** — answer plus ranked chunks as JSON:
+
+```bash
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"rag_query_with_chunks","arguments":{"question":"what is Taixing visa?"}},"id":1}' \
+  https://mcp-tool-rag-query-v1-prod.fly.dev/mcp/
+```

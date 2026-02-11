@@ -18,15 +18,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# ---- copy app code (.env / .env.qa / .env.prod are in .dockerignore; pass at run time) ----
+# ---- copy app code (.env is in .dockerignore; pass at run time via --env-file .env) ----
 COPY . .
-
-# ---- default env (override with docker run -e APP_ENV=qa or --env-file .env.qa) ----
-ENV APP_ENV=dev
 
 # ---- expose port ----
 EXPOSE 8000
 
 # ---- start MCP server ----
-# Require OPENAI_API_KEY and CHROMA_* via: docker run --env-file .env -e APP_ENV=dev ...
+# Require OPENAI_API_KEY and CHROMA_* via: docker run --env-file .env ...
 CMD ["uvicorn", "mcp_server:app", "--host", "0.0.0.0", "--port", "8000"]

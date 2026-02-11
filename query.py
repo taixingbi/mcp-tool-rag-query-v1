@@ -13,7 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 
-from config import CHAT_MODEL, RETRIEVAL_K, EMBEDDING_MODEL, CHROMA_SETTINGS, get_chroma_client
+from config import settings, get_chroma_client
 
 # Lazy singletons
 _chroma_collection = None
@@ -31,7 +31,7 @@ def _get_chroma_collection():
     if _chroma_collection is None:
         client = get_chroma_client()
         _chroma_collection = client.get_collection(
-            name=CHROMA_SETTINGS["collection_name"],
+            name=settings.chroma_collection,
             embedding_function=None,
         )
     return _chroma_collection
@@ -40,7 +40,7 @@ def _get_chroma_collection():
 def _get_embedder() -> OpenAIEmbeddings:
     global _embedder
     if _embedder is None:
-        _embedder = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+        _embedder = OpenAIEmbeddings(model=settings.embedding_model)
     return _embedder
 
 
@@ -99,7 +99,7 @@ class CloudRetriever(BaseRetriever):
         *,
         run_manager: CallbackManagerForRetrieverRun | None = None,
     ) -> List[Document]:
-        hits = _search_dense(query, k=RETRIEVAL_K * 2, where=self.where)
+        hits = _search_dense(query, k=settings.retrieval_k * 2, where=self.where)
         return [Document(page_content=h["text"], metadata=h["metadata"]) for h in hits]
 
 
@@ -110,7 +110,7 @@ def get_retriever(where: Optional[Dict[str, Any]] = None) -> CloudRetriever:
 
 
 def format_docs(docs: List[Document]) -> str:
-    return "\n\n---\n\n".join(doc.page_content for doc in docs[:RETRIEVAL_K])
+    return "\n\n---\n\n".join(doc.page_content for doc in docs[:settings.retrieval_k])
 
 
 RAG_PROMPT = ChatPromptTemplate.from_messages(
@@ -134,7 +134,7 @@ def build_rag_chain(where: Optional[Dict[str, Any]] = None):
             {"context": get_retriever(where=where) | format_docs, "question": RunnablePassthrough()}
             | RAG_PROMPT
             | ChatOpenAI(
-                model=CHAT_MODEL, 
+                model=settings.openai_model, 
                 temperature=0,
                 timeout=30,
                 max_retries=2
@@ -153,7 +153,7 @@ def run_query(question: str, where: Optional[Dict[str, Any]] = None) -> str:
 # ----------------------------
 def retrieve_ranked_chunks(
     question: str,
-    k: int = RETRIEVAL_K * 2,
+    k: int = settings.retrieval_k * 2,
     where: Optional[Dict[str, Any]] = None,
 ) -> List[dict]:
     """
@@ -182,7 +182,7 @@ def retrieve_ranked_chunks(
 def run_query_with_chunks(
     question: str,
     where: Optional[Dict[str, Any]] = None,
-    chunk_k: int = RETRIEVAL_K * 2,
+    chunk_k: int = settings.retrieval_k * 2,
 ) -> Dict[str, Any]:
     """
     Returns:
@@ -211,4 +211,4 @@ if __name__ == "__main__":
     print(f"A: {result['answer']}\n")
 
     print("Top ranked chunks:\n")
-    print(json.dumps(result["chunks"][:RETRIEVAL_K], indent=2, ensure_ascii=False))
+    print(json.dumps(result["chunks"][:settings.retrieval_k], indent=2, ensure_ascii=False))

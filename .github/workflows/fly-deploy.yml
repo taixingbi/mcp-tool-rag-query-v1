@@ -11,62 +11,26 @@ jobs:
   deploy:
     name: Deploy app
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-${{ github.ref }}
-      cancel-in-progress: false
+    concurrency: deploy-group
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Set deploy target
         id: target
         run: |
+          # main -> prod, qa -> qa, feature/* -> dev
           case "${{ github.ref }}" in
-            refs/heads/main)        echo "app=mcp-tool-rag-query-v1-prod" >> $GITHUB_OUTPUT; echo "env=prod" >> $GITHUB_OUTPUT ;;
-            refs/heads/qa)         echo "app=mcp-tool-rag-query-v1-qa" >> $GITHUB_OUTPUT; echo "env=qa" >> $GITHUB_OUTPUT ;;
-            refs/heads/feature/*)  echo "app=mcp-tool-rag-query-v1-dev" >> $GITHUB_OUTPUT; echo "env=dev" >> $GITHUB_OUTPUT ;;
+            refs/heads/main)        echo "app=mcp-tool-rag-query-v1-prod" >> $GITHUB_OUTPUT ;;
+            refs/heads/qa)         echo "app=mcp-tool-rag-query-v1-qa" >> $GITHUB_OUTPUT ;;
+            refs/heads/feature/*)  echo "app=mcp-tool-rag-query-v1-dev" >> $GITHUB_OUTPUT ;;
             *) echo "No deploy target for ${{ github.ref }}" && exit 1 ;;
           esac
       - name: Create app if not exists
-        run: flyctl apps create ${{ steps.target.outputs.app }} --yes || true
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      - name: Set Fly secrets (prod)
-        if: steps.target.outputs.env == 'prod'
         run: |
-          flyctl secrets set \
-            APP_ENV=prod \
-            CHROMA_API_KEY="${{ secrets.CHROMA_API_KEY_PROD }}" \
-            CHROMA_TENANT="${{ secrets.CHROMA_TENANT_PROD }}" \
-            CHROMA_DATABASE="${{ secrets.CHROMA_DATABASE_PROD }}" \
-            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            --app ${{ steps.target.outputs.app }}
+          flyctl apps create ${{ steps.target.outputs.app }} -y || true
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      - name: Set Fly secrets (qa)
-        if: steps.target.outputs.env == 'qa'
-        run: |
-          flyctl secrets set \
-            APP_ENV=qa \
-            CHROMA_API_KEY="${{ secrets.CHROMA_API_KEY_QA }}" \
-            CHROMA_TENANT="${{ secrets.CHROMA_TENANT_QA }}" \
-            CHROMA_DATABASE="${{ secrets.CHROMA_DATABASE_QA }}" \
-            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            --app ${{ steps.target.outputs.app }}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      - name: Set Fly secrets (dev)
-        if: steps.target.outputs.env == 'dev'
-        run: |
-          flyctl secrets set \
-            APP_ENV=dev \
-            CHROMA_API_KEY="${{ secrets.CHROMA_API_KEY_DEV }}" \
-            CHROMA_TENANT="${{ secrets.CHROMA_TENANT_DEV }}" \
-            CHROMA_DATABASE="${{ secrets.CHROMA_DATABASE_DEV }}" \
-            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            --app ${{ steps.target.outputs.app }}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      - name: Deploy
-        run: flyctl deploy --remote-only --app ${{ steps.target.outputs.app }}
+
+      - run: flyctl deploy --remote-only --app ${{ steps.target.outputs.app }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

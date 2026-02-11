@@ -3,6 +3,7 @@ import contextlib
 import json
 from fastapi import FastAPI
 from mcp.server import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from config import settings
 from query import run_query, run_query_with_chunks
@@ -13,8 +14,18 @@ mcp = FastMCP(
     stateless_http=True,
     json_response=True,
     streamable_http_path="/",
+    transport_security=TransportSecuritySettings(
+    enable_dns_rebinding_protection=True,
+    allowed_hosts=[
+        "127.0.0.1:*",
+        "localhost:*",
+        "[::1]:*",
+        "mcp-tool-rag-query-v1-dev.fly.dev",
+        "mcp-tool-rag-query-v1-qa.fly.dev",
+        "mcp-tool-rag-query-v1-prod.fly.dev",
+    ],
+),
 )
-
 
 @mcp.tool()
 def rag_query(question: str) -> str:
@@ -42,7 +53,7 @@ app = FastAPI(title=settings.mcp_name, version="0.1.0", lifespan=_lifespan)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "mcp": settings.mcp_name, "env": settings.app_env}
+    return {"status": "ok", "mcp": settings.mcp_name}
 
 
 app.mount("/mcp", mcp_app)
